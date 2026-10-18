@@ -1,40 +1,62 @@
 # 06 · Colocando no ar de graça
 
-O cliente não pode pagar, então tudo abaixo usa **planos gratuitos**.
+O cliente não pode pagar, então tudo usa **planos gratuitos** e só duas contas (as duas aceitam
+"entrar com GitHub"):
 
 ```mermaid
 flowchart LR
-    U([Usuário]) --> V[Vercel / Netlify<br/>front estático]
-    V -->|/api| R[Render<br/>Web Service free]
-    R --> N[(Neon<br/>Postgres free)]
-    R --> CL[(Cloudinary<br/>fotos free)]
+    U([Usuário]) -->|https://verdejar.onrender.com| R[Render · Web Service free<br/>API + site no mesmo serviço]
+    R --> N[(Neon · PostgreSQL free<br/>dados + fotos)]
+    R -->|RSS · IBGE · OpenStreetMap| EXT[Serviços públicos]
 ```
 
 | Peça | Serviço | Limite gratuito (aprox.) | Observação |
 |---|---|---|---|
-| Front | Vercel ou Netlify | sobra para esse uso | build `npm run build` em `frontend/` |
-| API | Render (Web Service) | 750 h/mês | "dorme" após 15 min sem uso; 1º acesso demora ~30 s |
-| Banco | Neon Postgres | 0,5 GB | suficiente para dezenas de milhares de registros |
-| Fotos | Cloudinary | ~25 GB | o disco do Render é apagado a cada deploy, por isso as fotos vão para fora |
+| Site + API | Render (Web Service) | 750 h/mês | "dorme" após 15 min sem acesso; o 1º acesso depois disso leva ~50 s |
+| Banco + fotos | Neon (PostgreSQL) | 0,5 GB | as fotos são reduzidas no navegador (~300 KB); cabem milhares de registros |
+
+### Por que um serviço só
+
+- **Login funciona em qualquer navegador.** Com site e API no mesmo domínio o cookie de sessão é "primário";
+  com domínios diferentes o Safari (iPhone) bloqueia e a pessoa seria deslogada ao recarregar.
+- **Menos contas e menos configuração.** Não precisa de Vercel nem de configurar CORS.
+- **Fotos no banco.** O disco do Render é apagado a cada reinício; guardar no Postgres evita uma terceira conta
+  (Cloudinary continua suportado via `CLOUDINARY_URL`, se um dia precisar).
 
 ## Passo a passo
 
-1. **Banco (Neon):** criar projeto, copiar a `DATABASE_URL`.
-2. **API:** nada a mudar no código — o projeto já usa PostgreSQL.
-3. **Render:** *New → Blueprint* usando o `render.yaml` da raiz (ou um *Web Service* apontando para a pasta `backend/`)
-   - Build: `npm ci && npx prisma migrate deploy && npm run build`
-   - Start: `npm start`
-   - Variáveis: `DATABASE_URL`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `WEB_ORIGIN`
-     (URL do front), `COOKIE_SECURE=true`, `CLOUDINARY_URL`, `SEED_ADMIN_EMAIL` e `SEED_ADMIN_PASSWORD`
-     (o admin do site em produção).
-   - Rodar o seed uma vez (Shell do Render): `npm run db:seed`.
-4. **Front (Vercel):** projeto apontando para `frontend/` (o `vercel.json` já trata as rotas da SPA), variável `VITE_API_URL=https://sua-api.onrender.com`.
-5. Entrar com o admin e promover quem vai ser mediador em **Usuários**.
+### 1. Banco no Neon
 
-> Dica: para evitar a "soneca" do Render, dá para usar um monitor gratuito (UptimeRobot)
+1. Entre em <https://neon.tech> → **Sign up** → **Continue with GitHub**.
+2. Crie um projeto (nome `verdejar`, região **AWS São Paulo** se aparecer, PostgreSQL 17).
+3. Na tela do projeto, clique em **Connect**, **desligue "Connection pooling"** e copie a
+   connection string (começa com `postgresql://` e termina com `?sslmode=require`).
+
+### 2. Site + API no Render
+
+1. Entre em <https://render.com> → **Get Started** → **GitHub**.
+2. **New → Blueprint** → escolha o repositório `verdejar` (autorize o acesso ao repositório se pedir).
+3. O Render lê o `render.yaml` e pede três valores:
+   - `DATABASE_URL`: a string copiada do Neon
+   - `SEED_ADMIN_EMAIL`: e-mail do administrador do site
+   - `SEED_ADMIN_PASSWORD`: senha do administrador
+4. **Apply**. O primeiro deploy leva ~5 min: instala, cria as tabelas, carrega as plantas iniciais e sobe.
+5. O endereço fica em `https://verdejar.onrender.com` (ou parecido, mostrado no topo do serviço).
+
+### 3. Depois de no ar
+
+- Entre com o admin e promova quem vai ser mediador em **Usuários**.
+- Cada `git push` na `main` faz um deploy novo automaticamente.
+
+> Dica: para evitar a "soneca" do plano gratuito, dá para usar um monitor gratuito (UptimeRobot)
 > chamando `/api/health` a cada 10 min.
 
-## Domínio
+## Domínio próprio (opcional)
 
-O endereço `*.vercel.app` é gratuito. Domínio `.com.br` próprio custa ~R$ 40/ano no Registro.br —
-é o único custo opcional.
+O endereço `*.onrender.com` é gratuito. Um `.com.br` próprio custa ~R$ 40/ano no Registro.br e se
+configura em **Settings → Custom Domains** no Render — é o único custo opcional.
+
+## Alternativa: front e API separados
+
+Também funciona hospedar o `frontend/` na Vercel (o `vercel.json` já trata as rotas) com
+`VITE_API_URL` apontando para a API. Nesse caso defina `WEB_ORIGIN` no backend com a URL do site.

@@ -1,24 +1,25 @@
-# Blueprint do Render (plano gratuito) para o backend.
-# Banco: crie um Postgres gratuito no Neon e coloque a URL em DATABASE_URL.
+# Blueprint do Render (plano gratuito): um serviço só, que entrega a API e o site.
+# Banco: PostgreSQL gratuito do Neon — cole a URL em DATABASE_URL ao criar o Blueprint.
+# Guia completo: docs/06-deploy-gratuito.md
 services:
   - type: web
-    name: verdejar-api
+    name: verdejar
     runtime: node
     plan: free
-    rootDir: backend
-    buildCommand: npm ci && npx prisma migrate deploy && npm run build
-    startCommand: npm start
+    region: oregon
+    buildCommand: >-
+      cd frontend && npm ci && npm run build &&
+      cd ../backend && npm ci && npx prisma migrate deploy && npm run build && npm run db:seed
+    startCommand: cd backend && NODE_ENV=production npm start
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
         value: '24'
       - key: DATABASE_URL
         sync: false
-      - key: WEB_ORIGIN
+      - key: SEED_ADMIN_EMAIL
         sync: false
-      - key: PUBLIC_URL
-        sync: false
-      - key: CLOUDINARY_URL
+      - key: SEED_ADMIN_PASSWORD
         sync: false
       - key: JWT_ACCESS_SECRET
         generateValue: true
@@ -26,7 +27,3 @@ services:
         generateValue: true
       - key: COOKIE_SECURE
         value: 'true'
-      - key: SEED_ADMIN_EMAIL
-        sync: false
-      - key: SEED_ADMIN_PASSWORD
-        sync: false
