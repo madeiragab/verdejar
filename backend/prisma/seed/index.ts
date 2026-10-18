@@ -3,6 +3,7 @@
  *   npm run db:seed        (idempotente: rodar de novo não duplica nada)
  */
 import 'dotenv/config';
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { PrismaClient, type Role } from '@prisma/client';
 import { formatScientificName, normalize, splitNames } from '../../src/lib/text.js';
@@ -77,21 +78,31 @@ async function main() {
   await seedReference();
   console.log(`✔ ${STATES.length} estados, ${BIOMES.length} biomas, ${NEWS_SOURCES.length} fontes de notícias`);
 
+  // No site público (SEED_DEMO_ACCOUNTS=false) ninguém pode entrar com as senhas de exemplo do README:
+  // não cria o mediador de exemplo e a "Maria" (autora do conteúdo inicial) recebe uma senha aleatória.
+  const demoAccounts = process.env.SEED_DEMO_ACCOUNTS !== 'false';
+  const randomPassword = () => crypto.randomBytes(24).toString('base64url');
+
   const admin = await upsertUser(
     'Administração',
-    process.env.SEED_ADMIN_EMAIL ?? 'admin@verdejar.app',
-    process.env.SEED_ADMIN_PASSWORD ?? PASSWORD,
+    process.env.SEED_ADMIN_EMAIL || 'admin@verdejar.app',
+    process.env.SEED_ADMIN_PASSWORD || (demoAccounts ? PASSWORD : randomPassword()),
     'ADMIN',
   );
-  const moderator = await upsertUser('Mediador(a) Exemplo', 'mediador@verdejar.app', PASSWORD, 'MODERATOR');
-  const maria = await upsertUser('Maria das Flores', 'maria@exemplo.com', PASSWORD, 'USER');
-  console.log(`✔ Usuários: ${admin.email} (admin), ${moderator.email} (mediador), ${maria.email} (colaboradora)`);
+  const moderator = demoAccounts
+    ? await upsertUser('Mediador(a) Exemplo', 'mediador@verdejar.app', PASSWORD, 'MODERATOR')
+    : null;
+  const maria = await upsertUser('Maria das Flores', 'maria@exemplo.com', demoAccounts ? PASSWORD : randomPassword(), 'USER');
+  console.log(
+    `✔ Usuários: ${admin.email} (admin)` +
+      (demoAccounts ? `, ${moderator!.email} (mediador), ${maria.email} (colaboradora)` : ' — contas de exemplo desativadas'),
+  );
 
   if ((await prisma.plantRecord.count()) > 0) {
     console.log('• Plantas já existem — pulando.');
     return;
   }
-  for (const p of approvedPlants) await createRecord(p, maria.id, moderator.id);
+  for (const p of approvedPlants) await createRecord(p, maria.id, (moderator ?? admin).id);
   for (const p of pendingPlants) await createRecord(p, maria.id, null);
   console.log(`✔ ${approvedPlants.length} registros publicados + ${pendingPlants.length} aguardando revisão`);
 }

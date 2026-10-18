@@ -57,7 +57,7 @@ tests/                   testes (Vitest)
 Modelo de dados e decisões: [docs/03-modelo-de-dados.md](../docs/03-modelo-de-dados.md) ·
 Endpoints: [docs/04-api.md](../docs/04-api.md)
 
-## Contas criadas pelo seed
+## Contas criadas pelo seed (só no ambiente local)
 
 | Papel | E-mail | Senha |
 |---|---|---|

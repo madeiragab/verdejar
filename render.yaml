@@ -27,3 +27,6 @@ services:
         generateValue: true
       - key: COOKIE_SECURE
         value: 'true'
+      # Site público: sem as contas de exemplo do README (senhas conhecidas)
+      - key: SEED_DEMO_ACCOUNTS
+        value: 'false'

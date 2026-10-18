@@ -115,7 +115,7 @@ npm run dev             # API (localhost:3333) + site (localhost:5173)
 Outros comandos na raiz: `npm test`, `npm run typecheck`, `npm run build`.
 Cada pasta também roda sozinha — veja o README do [backend](backend) e do [frontend](frontend).
 
-### Contas de exemplo
+### Contas de exemplo (só no ambiente local)
 
 | Papel | E-mail | Senha |
 |---|---|---|
