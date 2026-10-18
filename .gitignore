@@ -6,3 +6,6 @@ dist/
 api/uploads/*
 !api/uploads/.gitkeep
 .DS_Store
+*.log
+web/dist/
+api/dist/
