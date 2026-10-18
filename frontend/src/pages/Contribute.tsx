@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Camera, CheckCircle2, Crosshair, ImagePlus } from 'lucide-react';
-import { api, ApiError } from '../api/client';
-import type { Plant, PlantDetail } from '../api/types';
+import { ApiError } from '../api/client';
+import type { Plant } from '../api/types';
+import { plantsService, regionsService } from '../services';
 import { Alert, PageHeader, Spinner } from '../components/common';
 import { LocationPicker } from '../components/PlantMap';
 import { RegionSelect } from '../components/RegionSelect';
@@ -24,7 +25,7 @@ const EMPTY = {
   curiosities: '',
   photoCredit: '',
   state: '',
-  municipality: '',
+  municipalityCode: '',
   source: '',
   sourceUrl: '',
   showContributor: true,
@@ -49,12 +50,14 @@ export function Contribute() {
 
   useEffect(() => {
     if (!id) return;
-    api<PlantDetail>(`/plants/${id}`)
+    plantsService
+      .get(id)
       .then((p) => {
         setForm({
           ...EMPTY,
           ...Object.fromEntries(Object.keys(EMPTY).map((k) => [k, (p as unknown as Record<string, unknown>)[k] ?? ''])),
           popularNames: p.popularNames.join(', '),
+          municipalityCode: String(p.municipalityCode),
           showContributor: !!p.showContributor,
         } as FormState);
         if (p.latitude != null && p.longitude != null) setCoords({ lat: p.latitude, lng: p.longitude });
@@ -82,8 +85,10 @@ export function Contribute() {
         const point = { lat: c.latitude, lng: c.longitude };
         setCoords(point);
         try {
-          const place = await api<{ state: string | null; municipality: string | null }>('/regions/locate', { query: point });
-          if (place.state) setForm((f) => ({ ...f, state: place.state!, municipality: place.municipality ?? '' }));
+          const place = await regionsService.locate(point.lat, point.lng);
+          if (place.state) {
+            setForm((f) => ({ ...f, state: place.state!, municipalityCode: place.municipalityCode ? String(place.municipalityCode) : '' }));
+          }
         } catch {
           /* usuário escolhe manualmente */
         }
@@ -103,7 +108,8 @@ export function Contribute() {
       return;
     }
     const body = new FormData();
-    for (const [k, v] of Object.entries(form)) body.append(k, String(v));
+    // 'state' só serve para filtrar a lista de municípios; a API recebe o código IBGE.
+    for (const [k, v] of Object.entries(form)) if (k !== 'state') body.append(k, String(v));
     if (coords) {
       body.append('latitude', String(coords.lat));
       body.append('longitude', String(coords.lng));
@@ -112,7 +118,7 @@ export function Contribute() {
 
     setBusy(true);
     try {
-      const saved = await api<Plant>(editing ? `/plants/${id}` : '/plants', { method: editing ? 'PUT' : 'POST', body });
+      const saved = editing ? await plantsService.update(id!, body) : await plantsService.create(body);
       setDone(saved);
       window.scrollTo({ top: 0 });
     } catch (e2) {
@@ -226,12 +232,12 @@ export function Contribute() {
           <div className="cols-2">
             <RegionSelect
               state={form.state}
-              municipality={form.municipality}
+              municipality={form.municipalityCode}
               allowAll={false}
-              onChange={({ state, municipality }) => setForm((f) => ({ ...f, state, municipality }))}
+              onChange={({ state, municipality }) => setForm((f) => ({ ...f, state, municipalityCode: municipality }))}
             />
           </div>
-          {(err('state') || err('municipality')) && <small className="error">{err('state') ?? err('municipality')}</small>}
+          {err('municipalityCode') && <small className="error">{err('municipalityCode')}</small>}
           <div className="picker-head">
             <span className="muted small">Toque no mapa para marcar o ponto exato (opcional, mas ajuda a achar as mais próximas).</span>
             <button type="button" className="btn btn-ghost btn-sm" onClick={useMyLocation} disabled={locating}>

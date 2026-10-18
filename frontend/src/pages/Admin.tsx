@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { api, ApiError } from '../api/client';
-import type { Role, User } from '../api/types';
+import { ApiError } from '../api/client';
+import { usersService, type UserRow } from '../services';
+import type { Role } from '../api/types';
 import { useAuth } from '../auth/AuthContext';
 import { Alert, PageHeader, Spinner } from '../components/common';
 import { ROLE_LABEL } from '../lib/catalog';
 import { formatDate } from '../lib/format';
 import { useDocumentTitle } from '../lib/hooks';
 
-type Row = User & { plants: number };
+type Row = UserRow;
 
 export function Admin() {
   useDocumentTitle('Usuários');
@@ -17,13 +18,13 @@ export function Admin() {
   const [q, setQ] = useState('');
 
   useEffect(() => {
-    api<{ items: Row[] }>('/users').then((r) => setUsers(r.items));
+    usersService.list().then(setUsers);
   }, []);
 
   const changeRole = async (u: Row, role: Role) => {
     setError(null);
     try {
-      await api(`/users/${u.id}/role`, { method: 'PATCH', body: { role } });
+      await usersService.changeRole(u.id, role);
       setUsers((list) => list?.map((x) => (x.id === u.id ? { ...x, role } : x)) ?? null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Erro');

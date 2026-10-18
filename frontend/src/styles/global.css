@@ -388,3 +388,12 @@ input, select, textarea { font: inherit; color: inherit; }
   .kpi { min-width: 0; flex: 1; }
   .kpis .btn { width: 100%; }
 }
+
+/* ───────────── Histórico de moderação ───────────── */
+.timeline { list-style: none; margin: 4px 0 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 6px; font-size: 0.85rem; color: var(--ink-2); }
+.timeline li { position: relative; }
+.timeline li::before { content: ''; position: absolute; left: -20px; top: 6px; width: 10px; height: 10px; border-radius: 99px; background: var(--ink-3); border: 2px solid #fff; }
+.timeline-approved::before { background: var(--green-600) !important; }
+.timeline-rejected::before { background: var(--warning) !important; }
+.timeline-resubmitted::before { background: var(--info) !important; }
+.timeline-note { display: block; color: var(--ink-3); font-style: italic; }

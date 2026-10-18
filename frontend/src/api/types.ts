@@ -23,15 +23,20 @@ export interface Plant {
   toxicityLevel: string;
   toxicityNotes: string | null;
   curiosities: string | null;
+  biomeName: string;
   photoUrl: string | null;
   photoCredit: string | null;
+  photos: { url: string; credit: string | null }[];
   state: string;
   municipality: string;
+  municipalityCode: number;
   latitude: number | null;
   longitude: number | null;
   source: string;
   sourceUrl: string | null;
+  sources: { citation: string; url: string | null }[];
   contributor: { name: string } | null;
+  publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
   distanceKm?: number;
@@ -43,6 +48,28 @@ export interface Plant {
   isOwner?: boolean;
   submittedBy?: { id: string; name: string } | null;
   reviewedBy?: { name: string } | null;
+  history?: ReviewEntry[];
+}
+
+export type ReviewAction = 'SUBMITTED' | 'RESUBMITTED' | 'APPROVED' | 'REJECTED';
+
+export interface ReviewEntry {
+  action: ReviewAction;
+  note: string | null;
+  by: string | null;
+  at: string;
+}
+
+export interface Place {
+  state: string | null;
+  municipality: string | null;
+  municipalityCode: number | null;
+}
+
+export interface NewsSource {
+  id: string;
+  name: string;
+  site: string;
 }
 
 export interface PlantDetail extends Plant {

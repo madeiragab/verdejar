@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageSquareWarning, Pencil, Plus, Trash2 } from 'lucide-react';
-import { api } from '../api/client';
 import type { Plant } from '../api/types';
+import { plantsService } from '../services';
 import { useAuth } from '../auth/AuthContext';
 import { Empty, PageHeader, Spinner } from '../components/common';
 import { PlantPhoto } from '../components/PlantPhoto';
@@ -17,8 +17,9 @@ export function MyContributions() {
   const [items, setItems] = useState<Plant[] | null>(null);
 
   const load = () =>
-    api<{ items: Plant[] }>('/plants/mine')
-      .then((r) => setItems(r.items))
+    plantsService
+      .mine()
+      .then(setItems)
       .catch(() => setItems([]));
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export function MyContributions() {
 
   const remove = async (p: Plant) => {
     if (!confirm(`Remover "${p.popularNames[0]}"? Isso não pode ser desfeito.`)) return;
-    await api(`/plants/${p.id}`, { method: 'DELETE' });
+    await plantsService.remove(p.id);
     load();
   };
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
+import type { Place } from '../api/types';
+import { regionsService, type MunicipalityOption, type UF } from '../services';
 
 export interface Coords {
   lat: number;
@@ -8,11 +9,12 @@ export interface Coords {
 
 export type GeoState =
   | { status: 'idle' | 'locating' | 'denied' | 'unavailable' }
-  | { status: 'ready'; coords: Coords; state: string | null; municipality: string | null };
+  | ({ status: 'ready'; coords: Coords } & Place);
 
 const STORAGE_KEY = 'vj_last_location';
+const EMPTY_PLACE: Place = { state: null, municipality: null, municipalityCode: null };
 
-/** Pede a localização ao navegador e descobre o município pela API. Lembra a última posição. */
+/** Pede a localização ao navegador e descobre o município pela API. Lembra a última posição na sessão. */
 export function useLocation(auto = true) {
   const [geo, setGeo] = useState<GeoState>(() => {
     try {
@@ -30,12 +32,7 @@ export function useLocation(auto = true) {
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         const c = { lat: coords.latitude, lng: coords.longitude };
-        let place: { state: string | null; municipality: string | null } = { state: null, municipality: null };
-        try {
-          place = await api('/regions/locate', { query: c });
-        } catch {
-          /* segue só com as coordenadas */
-        }
+        const place = await regionsService.locate(c.lat, c.lng).catch(() => EMPTY_PLACE);
         const next: GeoState = { status: 'ready', coords: c, ...place };
         setGeo(next);
         try {
@@ -57,40 +54,37 @@ export function useLocation(auto = true) {
   return { geo, locate };
 }
 
-export interface UF {
-  uf: string;
-  name: string;
-}
-
 let statesCache: UF[] | null = null;
-const munCache = new Map<string, string[]>();
+const munCache = new Map<string, MunicipalityOption[]>();
 
 export function useStates() {
   const [states, setStates] = useState<UF[]>(statesCache ?? []);
   useEffect(() => {
     if (statesCache) return;
-    api<{ items: UF[] }>('/regions/states')
-      .then((r) => {
-        statesCache = r.items;
-        setStates(r.items);
+    regionsService
+      .states()
+      .then((items) => {
+        statesCache = items;
+        setStates(items);
       })
       .catch(() => {});
   }, []);
   return states;
 }
 
+/** Municípios oficiais (IBGE) da UF, com cache em memória. */
 export function useMunicipalities(uf: string | undefined) {
-  const [list, setList] = useState<string[]>([]);
+  const [list, setList] = useState<MunicipalityOption[]>([]);
   useEffect(() => {
     if (!uf) return setList([]);
     const hit = munCache.get(uf);
     if (hit) return setList(hit);
     let alive = true;
-    api<{ items: { name: string }[] }>(`/regions/states/${uf}/municipalities`)
-      .then((r) => {
-        const names = r.items.map((m) => m.name);
-        munCache.set(uf, names);
-        if (alive) setList(names);
+    regionsService
+      .municipalities(uf)
+      .then((items) => {
+        munCache.set(uf, items);
+        if (alive) setList(items);
       })
       .catch(() => alive && setList([]));
     return () => {

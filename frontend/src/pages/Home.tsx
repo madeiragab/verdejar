@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Crosshair, MapPin, Newspaper, ShieldCheck, Upload } from 'lucide-react';
-import { api } from '../api/client';
-import type { NewsItem, Page, Plant, Stats } from '../api/types';
+import type { NewsItem, Plant, Stats } from '../api/types';
 import { Empty } from '../components/common';
 import { NewsCard } from '../components/NewsCard';
 import { PlantGrid, PlantGridSkeleton } from '../components/PlantCard';
 import { PlantMap } from '../components/PlantMap';
 import { useDocumentTitle, useLocation, useStates } from '../lib/hooks';
+import { newsService, plantsService } from '../services';
 
 export function Home() {
   useDocumentTitle('');
@@ -19,9 +19,10 @@ export function Home() {
   const [news, setNews] = useState<NewsItem[]>([]);
 
   useEffect(() => {
-    api<Stats>('/plants/stats').then(setStats).catch(() => {});
-    api<{ items: NewsItem[] }>('/news', { query: { limit: 4 } })
-      .then((r) => setNews(r.items))
+    plantsService.stats().then(setStats).catch(() => {});
+    newsService
+      .list({ limit: 4 })
+      .then(setNews)
       .catch(() => {});
   }, []);
 
@@ -34,7 +35,8 @@ export function Home() {
       ? { lat: coords.lat, lng: coords.lng, sort: 'distance', limit: 8 }
       : { state: manualUf || undefined, limit: 8 };
     const ctrl = new AbortController();
-    api<Page<Plant>>('/plants', { query, signal: ctrl.signal })
+    plantsService
+      .list(query, ctrl.signal)
       .then((r) => setPlants(r.items))
       .catch((e) => e.name !== 'AbortError' && setPlants([]));
     return () => ctrl.abort();
@@ -49,7 +51,7 @@ export function Home() {
 
   const exploreLink =
     geo.status === 'ready' && geo.state
-      ? `/explorar?state=${geo.state}${geo.municipality ? `&municipality=${encodeURIComponent(geo.municipality)}` : ''}`
+      ? `/explorar?state=${geo.state}${geo.municipalityCode ? `&municipality=${geo.municipalityCode}` : ''}`
       : '/explorar';
 
   return (

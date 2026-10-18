@@ -1,30 +1,25 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api/client';
-import type { NewsItem } from '../api/types';
+import type { NewsItem, NewsSource } from '../api/types';
+import { newsService } from '../services';
 import { Empty, PageHeader } from '../components/common';
 import { NewsCard } from '../components/NewsCard';
 import { useDocumentTitle } from '../lib/hooks';
 
-interface Source {
-  id: string;
-  name: string;
-  site: string;
-}
-
 export function News() {
   useDocumentTitle('Notícias');
   const [items, setItems] = useState<NewsItem[] | null>(null);
-  const [sources, setSources] = useState<Source[]>([]);
+  const [sources, setSources] = useState<NewsSource[]>([]);
   const [source, setSource] = useState('');
 
   useEffect(() => {
-    api<{ items: Source[] }>('/news/sources').then((r) => setSources(r.items)).catch(() => {});
+    newsService.sources().then(setSources).catch(() => {});
   }, []);
 
   useEffect(() => {
     setItems(null);
-    api<{ items: NewsItem[] }>('/news', { query: { limit: 36, source } })
-      .then((r) => setItems(r.items))
+    newsService
+      .list({ limit: 36, source: source || undefined })
+      .then(setItems)
       .catch(() => setItems([]));
   }, [source]);
 
@@ -39,7 +34,7 @@ export function News() {
           Todas
         </button>
         {sources.map((s) => (
-          <button key={s.id} className={`pill ${source === s.name ? 'is-active' : ''}`} onClick={() => setSource(s.name)}>
+          <button key={s.id} className={`pill ${source === s.id ? 'is-active' : ''}`} onClick={() => setSource(s.id)}>
             {s.name}
           </button>
         ))}

@@ -1,14 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Check, ExternalLink, MapPin, RefreshCw, UserRound, X } from 'lucide-react';
-import { api, ApiError } from '../api/client';
-import type { Plant, Status } from '../api/types';
+import { ApiError } from '../api/client';
+import type { Plant, ReviewAction, Status } from '../api/types';
+import { moderationService, newsService } from '../services';
 import { Alert, Empty, PageHeader, Spinner } from '../components/common';
 import { PlantPhoto } from '../components/PlantPhoto';
 import { StatusBadge } from '../components/StatusBadge';
 import { BIOMES, LIGHT, TOXICITY, WATER } from '../lib/catalog';
 import { formatDate } from '../lib/format';
 import { useDocumentTitle } from '../lib/hooks';
+
+const ACTION_LABEL: Record<ReviewAction, string> = {
+  SUBMITTED: 'Enviado',
+  RESUBMITTED: 'Corrigido e reenviado',
+  APPROVED: 'Aprovado',
+  REJECTED: 'Recusado',
+};
 
 const TABS: { status: Status; label: string }[] = [
   { status: 'PENDING', label: 'Pendentes' },
@@ -25,7 +33,8 @@ export function Moderation() {
 
   const load = () => {
     setItems(null);
-    api<{ items: Plant[]; counts: Record<string, number> }>('/moderation/plants', { query: { status } })
+    moderationService
+      .queue(status)
       .then((r) => {
         setItems(r.items);
         setCounts(r.counts);
@@ -38,7 +47,7 @@ export function Moderation() {
   const refreshNews = async () => {
     setNewsMsg('Atualizando notícias…');
     try {
-      const r = await api<{ added: number; errors: string[] }>('/news/refresh', { method: 'POST' });
+      const r = await newsService.refresh();
       setNewsMsg(`${r.added} notícias novas${r.errors.length ? ` · ${r.errors.length} fonte(s) com falha` : ''}`);
     } catch {
       setNewsMsg('Não foi possível atualizar agora');
@@ -91,7 +100,8 @@ function ReviewCard({ plant: p, onDone }: { plant: Plant; onDone: () => void }) 
     setBusy(true);
     setError(null);
     try {
-      await api(`/moderation/plants/${p.id}/${action}`, { method: 'POST', body: { note: note || undefined } });
+      if (action === 'approve') await moderationService.approve(p.id, note || undefined);
+      else await moderationService.reject(p.id, note);
       onDone();
     } catch (e) {
       setError(e instanceof ApiError ? (e.details?.note?.[0] ?? e.message) : 'Erro');
@@ -174,7 +184,16 @@ function ReviewCard({ plant: p, onDone }: { plant: Plant; onDone: () => void }) 
           {p.showContributor ? ' (autorizou exibir o nome)' : ' (anônimo no site)'} · enviado em {formatDate(p.updatedAt)}
           {p.reviewedBy && ` · revisado por ${p.reviewedBy.name}`}
         </p>
-        {p.reviewNote && <p className="review-note">Observação: {p.reviewNote}</p>}
+        {p.history && p.history.length > 0 && (
+          <ol className="timeline">
+            {[...p.history].reverse().map((h, i) => (
+              <li key={i} className={`timeline-${h.action.toLowerCase()}`}>
+                <strong>{ACTION_LABEL[h.action]}</strong> {h.by && `por ${h.by}`} · {formatDate(h.at)}
+                {h.note && <span className="timeline-note">“{h.note}”</span>}
+              </li>
+            ))}
+          </ol>
+        )}
 
         {error && <Alert>{error}</Alert>}
         <div className="review-actions">

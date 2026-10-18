@@ -15,7 +15,8 @@ import {
   TriangleAlert,
   UserRound,
 } from 'lucide-react';
-import { api, ApiError } from '../api/client';
+import { ApiError } from '../api/client';
+import { plantsService } from '../services';
 import type { PlantDetail as Detail } from '../api/types';
 import { Alert, Empty, Spinner } from '../components/common';
 import { PlantCard } from '../components/PlantCard';
@@ -39,7 +40,8 @@ export function PlantDetail() {
     if (!ready) return; // espera a sessão para o autor/mediador conseguir ver registros pendentes
     setPlant(null);
     setError(null);
-    api<Detail>(`/plants/${id}`)
+    plantsService
+      .get(id!)
       .then(setPlant)
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Erro ao carregar'));
   }, [id, ready]);
@@ -97,7 +99,7 @@ export function PlantDetail() {
             <li>
               <Trees size={18} />
               <span>Bioma</span>
-              <strong>{BIOMES[plant.biome]}</strong>
+              <strong>{plant.biomeName ?? BIOMES[plant.biome]}</strong>
             </li>
             <li>
               <Sun size={18} />

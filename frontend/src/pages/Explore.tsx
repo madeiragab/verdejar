@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { LayoutGrid, Map as MapIcon, Search, SlidersHorizontal, X } from 'lucide-react';
-import { api } from '../api/client';
 import type { Page, Plant } from '../api/types';
+import { plantsService } from '../services';
 import { Empty, PageHeader } from '../components/common';
 import { PlantGrid, PlantGridSkeleton } from '../components/PlantCard';
 import { PlantMap } from '../components/PlantMap';
@@ -55,7 +55,8 @@ export function Explore() {
       lng: coords?.lng,
     };
     if (page === 1) setData(null);
-    api<Page<Plant>>('/plants', { query, signal: ctrl.signal })
+    plantsService
+      .list(query, ctrl.signal)
       .then((r) =>
         setData((prev) => (page > 1 && prev && view === 'grid' ? { ...r, items: [...prev.items, ...r.items] } : r)),
       )

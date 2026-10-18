@@ -2,6 +2,7 @@ import { useMunicipalities, useStates } from '../lib/hooks';
 
 interface Props {
   state: string;
+  /** Código IBGE do município (string vazia = nenhum). */
   municipality: string;
   onChange: (v: { state: string; municipality: string }) => void;
   allowAll?: boolean;
@@ -17,11 +18,7 @@ export function RegionSelect({ state, municipality, onChange, allowAll = true, r
     <>
       <label className="field">
         <span>Estado</span>
-        <select
-          value={state}
-          required={required}
-          onChange={(e) => onChange({ state: e.target.value, municipality: '' })}
-        >
+        <select value={state} required={required} onChange={(e) => onChange({ state: e.target.value, municipality: '' })}>
           <option value="">{allowAll ? 'Todos os estados' : 'Selecione'}</option>
           {states.map((s) => (
             <option key={s.uf} value={s.uf}>
@@ -39,11 +36,9 @@ export function RegionSelect({ state, municipality, onChange, allowAll = true, r
           onChange={(e) => onChange({ state, municipality: e.target.value })}
         >
           <option value="">{!state ? 'Escolha o estado' : allowAll ? 'Todos os municípios' : 'Selecione'}</option>
-          {/* Mantém o valor atual visível mesmo antes da lista carregar */}
-          {municipality && !municipalities.includes(municipality) && <option value={municipality}>{municipality}</option>}
           {municipalities.map((m) => (
-            <option key={m} value={m}>
-              {m}
+            <option key={m.code} value={String(m.code)}>
+              {m.name}
             </option>
           ))}
         </select>
