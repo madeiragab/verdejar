@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -8,6 +11,7 @@ import { UPLOAD_DIR } from './lib/storage.js';
 import { errorHandler, notFoundHandler } from './middlewares/error.js';
 import { authRoutes } from './modules/auth/auth.routes.js';
 import { catalogRoutes } from './modules/catalog/catalog.routes.js';
+import { fileRoutes } from './modules/files/files.routes.js';
 import { moderationRoutes } from './modules/moderation/moderation.routes.js';
 import { newsRoutes } from './modules/news/news.routes.js';
 import { plantRoutes } from './modules/plants/plants.routes.js';
@@ -18,7 +22,21 @@ export function createApp() {
   const app = express();
 
   app.set('trust proxy', 1); // atrás do proxy do Render: IP correto no rate limit
-  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: {
+        directives: {
+          // Fotos e notícias vêm de vários sites; mapas do OpenStreetMap; fontes do Google.
+          'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+          'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+          'font-src': ["'self'", 'https://fonts.gstatic.com'],
+          'connect-src': ["'self'"],
+        },
+      },
+    }),
+  );
+  app.use(compression());
   app.use(cors({ origin: config.webOrigin, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
   app.use(cookieParser());
@@ -38,7 +56,16 @@ export function createApp() {
   api.use('/regions', regionRoutes);
   api.use('/news', newsRoutes);
   api.use('/users', userRoutes);
+  api.use('/files', fileRoutes);
+  api.use(notFoundHandler);
   app.use('/api', api);
+
+  // Produção num serviço só: a API também entrega o site (mesmo domínio → cookie de sessão sem bloqueio).
+  const indexHtml = path.join(config.frontendDist, 'index.html');
+  if (fs.existsSync(indexHtml)) {
+    app.use(express.static(config.frontendDist, { index: false, maxAge: '1y', immutable: true }));
+    app.get('*', (_req, res) => res.set('Cache-Control', 'no-cache').sendFile(indexHtml));
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

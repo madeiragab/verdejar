@@ -219,6 +219,18 @@ model Review {
   @@map("reviews")
 }
 
+/// Fotos enviadas pelos colaboradores, guardadas no próprio banco.
+/// Hospedagens gratuitas apagam o disco a cada reinício; assim nada se perde e não precisa de outro serviço.
+model StoredFile {
+  id        String   @id @default(uuid()) @db.Uuid
+  mimeType  String   @map("mime_type") @db.VarChar(40)
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("stored_files")
+}
+
 // ──────────────────────── Notícias ────────────────────────
 
 model NewsSource {

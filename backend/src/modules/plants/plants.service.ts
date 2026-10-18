@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 import { badRequest, forbidden, notFound } from '../../lib/errors.js';
 import { haversineKm } from '../../lib/geo.js';
 import { prisma } from '../../lib/prisma.js';
-import { deleteLocalPhoto, savePhoto } from '../../lib/storage.js';
+import { deletePhoto, savePhoto } from '../../lib/storage.js';
 import { formatScientificName, normalize, splitNames } from '../../lib/text.js';
 import type { AccessPayload } from '../../lib/tokens.js';
 import { isAdmin, isModerator } from '../../middlewares/auth.js';
@@ -235,7 +235,7 @@ export async function update(id: string, input: PlantInput, photo: UploadedFile,
     });
   });
 
-  if (newPhotoUrl) await Promise.all(current.photos.map((p) => deleteLocalPhoto(p.url)));
+  if (newPhotoUrl) await Promise.all(current.photos.map((p) => deletePhoto(p.url)));
   return toPlantDto(record, viewer);
 }
 
@@ -244,5 +244,5 @@ export async function remove(id: string, viewer: AccessPayload) {
   if (!current) throw notFound('Planta não encontrada');
   if (current.contributorId !== viewer.sub && !isAdmin(viewer)) throw forbidden();
   await prisma.plantRecord.delete({ where: { id } });
-  await Promise.all(current.photos.map((p) => deleteLocalPhoto(p.url)));
+  await Promise.all(current.photos.map((p) => deletePhoto(p.url)));
 }
