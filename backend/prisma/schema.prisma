@@ -1,0 +1,248 @@
+// Modelo de dados do Verdejar — veja docs/03-modelo-de-dados.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Enums ───────────────────────────
+
+enum Role {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum RecordStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum LightNeed {
+  SOL_PLENO
+  MEIA_SOMBRA
+  SOMBRA
+}
+
+enum WaterNeed {
+  BAIXA
+  MEDIA
+  ALTA
+}
+
+enum ToxicityLevel {
+  NENHUMA
+  BAIXA
+  MODERADA
+  ALTA
+  DESCONHECIDA
+}
+
+enum ReviewAction {
+  SUBMITTED
+  RESUBMITTED
+  APPROVED
+  REJECTED
+}
+
+// ───────────────────── Usuários e sessões ─────────────────────
+
+model User {
+  id            String         @id @default(uuid()) @db.Uuid
+  name          String         @db.VarChar(80)
+  email         String         @unique @db.VarChar(160)
+  passwordHash  String         @map("password_hash")
+  role          Role           @default(USER)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  records       PlantRecord[]
+  reviews       Review[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  tokenHash String    @unique @map("token_hash") @db.Char(64)
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ─────────────────── Geografia (IBGE) e biomas ───────────────────
+
+model State {
+  uf             String         @id @db.Char(2)
+  ibgeCode       Int            @unique @map("ibge_code")
+  name           String         @db.VarChar(40)
+  region         String         @db.VarChar(20)
+  municipalities Municipality[]
+
+  @@map("states")
+}
+
+/// Criado sob demanda (a partir da API do IBGE) quando alguém registra uma planta no município.
+model Municipality {
+  ibgeCode Int           @id @map("ibge_code")
+  name     String        @db.VarChar(80)
+  stateUf  String        @map("state_uf") @db.Char(2)
+  state    State         @relation(fields: [stateUf], references: [uf])
+  records  PlantRecord[]
+
+  @@index([stateUf, name])
+  @@map("municipalities")
+}
+
+model Biome {
+  code        String        @id @db.VarChar(20)
+  name        String        @db.VarChar(40)
+  description String?
+  records     PlantRecord[]
+
+  @@map("biomes")
+}
+
+// ──────────────────────── Plantas ────────────────────────
+
+/// A espécie (táxon). Vários registros, em lugares diferentes, apontam para a mesma espécie.
+model Species {
+  id             String        @id @default(uuid()) @db.Uuid
+  scientificName String        @unique @map("scientific_name") @db.VarChar(120)
+  family         String?       @db.VarChar(80)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  records        PlantRecord[]
+
+  @@map("species")
+}
+
+/// Um registro = uma planta observada em um município, enviada por um colaborador e revisada por um mediador.
+model PlantRecord {
+  id               String        @id @default(uuid()) @db.Uuid
+  speciesId        String        @map("species_id") @db.Uuid
+  species          Species       @relation(fields: [speciesId], references: [id])
+  municipalityCode Int           @map("municipality_code")
+  municipality     Municipality  @relation(fields: [municipalityCode], references: [ibgeCode])
+  biomeCode        String        @map("biome_code") @db.VarChar(20)
+  biome            Biome         @relation(fields: [biomeCode], references: [code])
+  latitude         Float?
+  longitude        Float?
+  description      String?
+  climate          String?       @db.VarChar(200)
+  light            LightNeed
+  water            WaterNeed
+  medicinalUse     String?       @map("medicinal_use")
+  toxicityLevel    ToxicityLevel @default(DESCONHECIDA) @map("toxicity_level")
+  toxicityNotes    String?       @map("toxicity_notes")
+  curiosities      String?
+  status           RecordStatus  @default(PENDING)
+  showContributor  Boolean       @default(false) @map("show_contributor")
+  contributorId    String?       @map("contributor_id") @db.Uuid
+  contributor      User?         @relation(fields: [contributorId], references: [id], onDelete: SetNull)
+  /// Texto normalizado (sem acento, minúsculo) usado na busca.
+  searchText       String        @default("") @map("search_text")
+  publishedAt      DateTime?     @map("published_at")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  popularNames PopularName[]
+  photos       Photo[]
+  sources      Source[]
+  reviews      Review[]
+
+  @@index([status, municipalityCode])
+  @@index([status, biomeCode])
+  @@index([speciesId])
+  @@index([contributorId])
+  @@map("plant_records")
+}
+
+model PopularName {
+  id       String      @id @default(uuid()) @db.Uuid
+  recordId String      @map("record_id") @db.Uuid
+  record   PlantRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  name     String      @db.VarChar(80)
+  position Int         @default(0) @db.SmallInt
+
+  @@unique([recordId, name])
+  @@map("popular_names")
+}
+
+model Photo {
+  id        String      @id @default(uuid()) @db.Uuid
+  recordId  String      @map("record_id") @db.Uuid
+  record    PlantRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  url       String
+  credit    String?     @db.VarChar(200)
+  position  Int         @default(0) @db.SmallInt
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@index([recordId])
+  @@map("photos")
+}
+
+/// Referência onde o colaborador confirmou a espécie (livro, artigo, site, herbário…).
+model Source {
+  id       String      @id @default(uuid()) @db.Uuid
+  recordId String      @map("record_id") @db.Uuid
+  record   PlantRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  citation String      @db.VarChar(500)
+  url      String?     @db.VarChar(500)
+  position Int         @default(0) @db.SmallInt
+
+  @@index([recordId])
+  @@map("sources")
+}
+
+/// Histórico de moderação: envio, reenvio, aprovação e recusa.
+model Review {
+  id        String       @id @default(uuid()) @db.Uuid
+  recordId  String       @map("record_id") @db.Uuid
+  record    PlantRecord  @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  actorId   String?      @map("actor_id") @db.Uuid
+  actor     User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action    ReviewAction
+  note      String?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  @@index([recordId, createdAt])
+  @@map("reviews")
+}
+
+// ──────────────────────── Notícias ────────────────────────
+
+model NewsSource {
+  id      String     @id @db.VarChar(40)
+  name    String     @db.VarChar(80)
+  feedUrl String     @map("feed_url")
+  siteUrl String     @map("site_url")
+  active  Boolean    @default(true)
+  items   NewsItem[]
+
+  @@map("news_sources")
+}
+
+model NewsItem {
+  id          String     @id @default(uuid()) @db.Uuid
+  sourceId    String     @map("source_id") @db.VarChar(40)
+  source      NewsSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title       String
+  link        String     @unique
+  summary     String?
+  imageUrl    String?    @map("image_url")
+  publishedAt DateTime   @map("published_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  @@index([publishedAt])
+  @@map("news_items")
+}
