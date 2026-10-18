@@ -9,6 +9,7 @@ import { LocationPicker } from '../components/PlantMap';
 import { RegionSelect } from '../components/RegionSelect';
 import { BIOMES, LIGHT, TOXICITY, WATER } from '../lib/catalog';
 import { useDocumentTitle, type Coords } from '../lib/hooks';
+import { mediaUrl, shrinkImage } from '../lib/image';
 
 const EMPTY = {
   scientificName: '',
@@ -61,7 +62,7 @@ export function Contribute() {
           showContributor: !!p.showContributor,
         } as FormState);
         if (p.latitude != null && p.longitude != null) setCoords({ lat: p.latitude, lng: p.longitude });
-        setPreview(p.photoUrl);
+        setPreview(mediaUrl(p.photoUrl));
       })
       .catch(() => navigate('/minhas-contribuicoes'))
       .finally(() => setLoading(false));
@@ -188,7 +189,10 @@ export function Contribute() {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               capture="environment"
-              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                setPhoto(file ? await shrinkImage(file) : null);
+              }}
             />
             {preview && (
               <span className="dropzone-change">

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Leaf } from 'lucide-react';
 import { BIOME_COLOR } from '../lib/catalog';
+import { mediaUrl } from '../lib/image';
 
 interface Props {
   src: string | null;
@@ -26,5 +27,5 @@ export function PlantPhoto({ src, alt, biome, className = '' }: Props) {
       </div>
     );
   }
-  return <img className={`photo ${className}`} src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} />;
+  return <img className={`photo ${className}`} src={mediaUrl(src)!} alt={alt} loading="lazy" onError={() => setFailed(true)} />;
 }

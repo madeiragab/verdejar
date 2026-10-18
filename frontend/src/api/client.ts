@@ -1,6 +1,8 @@
 import type { Session } from './types';
 
-const BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '') + '/api';
+/** Origem da API: vazia quando site e API estão no mesmo domínio (dev com proxy e produção no Render). */
+export const API_ORIGIN = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+const BASE = API_ORIGIN + '/api';
 
 export class ApiError extends Error {
   constructor(
