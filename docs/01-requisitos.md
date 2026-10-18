@@ -42,7 +42,7 @@ antes de qualquer conteúdo ficar público.
 | RNF04 | Senhas com hash bcrypt; validação de toda entrada; rate limit no login |
 | RNF05 | Responsivo (a maioria vai acessar pelo celular) |
 | RNF06 | Interface em português |
-| RNF07 | Fácil de rodar localmente sem instalar banco de dados (SQLite no dev) |
+| RNF07 | Fácil de rodar localmente: PostgreSQL sobe com um comando, sem Docker |
 
 ## Fora do escopo desta primeira versão
 

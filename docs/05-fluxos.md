@@ -91,6 +91,6 @@ flowchart LR
     L --> G[GET /news]
 ```
 
-Fontes iniciais (configuráveis em `api/src/modules/news/sources.ts`):
+Fontes iniciais (tabela `news_sources`, carregada pelo seed):
 O Eco, ClimaInfo, Agência Brasil – Meio Ambiente, G1 Natureza e MetSul Meteorologia.
 Cada notícia leva o link para o site original (o conteúdo continua sendo deles).

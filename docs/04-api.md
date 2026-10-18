@@ -25,9 +25,9 @@ Legenda: 🌐 público · 🔑 logado · 🛡️ mediador · 👑 admin
 
 | Método | Rota | | Descrição |
 |---|---|---|---|
-| GET | `/plants` | 🌐 | Lista **aprovadas**. Query: `q, state, municipality, biome, light, water, toxicity, lat, lng, radiusKm, sort=recent\|distance\|name, page, limit` |
+| GET | `/plants` | 🌐 | Lista **aprovadas**. Query: `q, state (UF), municipality (código IBGE), biome, light, water, toxicity, lat, lng, radiusKm, sort=recent\|distance\|name, page, limit` |
 | GET | `/plants/:id` | 🌐 | Detalhe (aprovada, ou do próprio autor, ou para mediador) + `related` |
-| POST | `/plants` | 🔑 | `multipart/form-data` com `photo` + campos → cria `PENDING` |
+| POST | `/plants` | 🔑 | `multipart/form-data` com `photo` + campos (`municipalityCode` = código IBGE) → cria `PENDING` |
 | GET | `/plants/mine` | 🔑 | Registros do usuário em qualquer status |
 | PUT | `/plants/:id` | 🔑 dono | Edita; volta para `PENDING` |
 | DELETE | `/plants/:id` | 🔑 dono / 👑 | Remove |
@@ -57,7 +57,7 @@ Resposta de lista:
 |---|---|---|---|
 | GET | `/regions/states` | 🌐 | UFs (IBGE, cache 24 h) |
 | GET | `/regions/states/:uf/municipalities` | 🌐 | Municípios da UF (IBGE, cache 24 h) |
-| GET | `/regions/locate?lat&lng` | 🌐 | Coordenadas → `{ state, municipality }` (Nominatim, cache) |
+| GET | `/regions/locate?lat&lng` | 🌐 | Coordenadas → `{ state, municipality, municipalityCode }` (Nominatim + IBGE, cache) |
 
 ## Notícias
 

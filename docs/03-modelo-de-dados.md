@@ -1,91 +1,167 @@
 # 03 · Modelo de dados
 
+Banco **PostgreSQL**, modelado com **Prisma** (`backend/prisma/schema.prisma`) e versionado por
+**migrations** (`backend/prisma/migrations/`). Tabelas e colunas em `snake_case`; chaves primárias UUID,
+exceto tabelas de referência que usam o código oficial (UF, código IBGE, código do bioma).
+
+## Diagrama entidade-relacionamento
+
 ```mermaid
 erDiagram
-    USER ||--o{ PLANT : "envia"
-    USER ||--o{ PLANT : "revisa"
-    USER ||--o{ REFRESH_TOKEN : "possui"
+    users ||--o{ refresh_tokens : "tem sessões"
+    users ||--o{ plant_records : "envia"
+    users ||--o{ reviews : "registra ação"
 
-    USER {
-        string id PK
-        string name
-        string email UK
-        string passwordHash
-        string role "USER | MODERATOR | ADMIN"
-        datetime createdAt
+    states ||--o{ municipalities : "possui"
+    municipalities ||--o{ plant_records : "localiza"
+    biomes ||--o{ plant_records : "classifica"
+    species ||--o{ plant_records : "é observada em"
+
+    plant_records ||--|{ popular_names : "nomes populares"
+    plant_records ||--o{ photos : "fotos"
+    plant_records ||--|{ sources : "fontes"
+    plant_records ||--|{ reviews : "histórico de moderação"
+
+    news_sources ||--o{ news_items : "publica"
+
+    users {
+        uuid id PK
+        varchar name
+        varchar email UK
+        text password_hash
+        enum role "USER | MODERATOR | ADMIN"
+        timestamp created_at
+        timestamp updated_at
     }
-
-    PLANT {
-        string id PK
-        string scientificName
-        string popularNames "separados por vírgula"
-        string family
-        string description
-        string biome "AMAZONIA | CERRADO | ..."
-        string climate
-        string light "SOL_PLENO | MEIA_SOMBRA | SOMBRA"
-        string water "BAIXA | MEDIA | ALTA"
-        string medicinalUse
-        string toxicityLevel "NENHUMA | BAIXA | MODERADA | ALTA | DESCONHECIDA"
-        string toxicityNotes
-        string curiosities
-        string photoUrl
-        string photoCredit
-        string state "UF"
-        string municipality
+    refresh_tokens {
+        uuid id PK
+        char64 token_hash UK "SHA-256 do token"
+        uuid user_id FK
+        timestamp expires_at
+        timestamp revoked_at
+    }
+    states {
+        char2 uf PK
+        int ibge_code UK
+        varchar name
+        varchar region
+    }
+    municipalities {
+        int ibge_code PK "código oficial IBGE"
+        varchar name
+        char2 state_uf FK
+    }
+    biomes {
+        varchar code PK "CERRADO, CAATINGA…"
+        varchar name
+        text description
+    }
+    species {
+        uuid id PK
+        varchar scientific_name UK
+        varchar family
+    }
+    plant_records {
+        uuid id PK
+        uuid species_id FK
+        int municipality_code FK
+        varchar biome_code FK
         float latitude
         float longitude
-        string source "referência usada"
-        string sourceUrl
-        string status "PENDING | APPROVED | REJECTED"
-        string reviewNote
-        boolean showContributor
-        string contributorId FK
-        string reviewedById FK
-        datetime reviewedAt
-        datetime createdAt
-        datetime updatedAt
+        text description
+        varchar climate
+        enum light "SOL_PLENO | MEIA_SOMBRA | SOMBRA"
+        enum water "BAIXA | MEDIA | ALTA"
+        text medicinal_use
+        enum toxicity_level "NENHUMA … ALTA | DESCONHECIDA"
+        text toxicity_notes
+        text curiosities
+        enum status "PENDING | APPROVED | REJECTED"
+        bool show_contributor "consentimento de crédito"
+        uuid contributor_id FK
+        text search_text "busca sem acento"
+        timestamp published_at
     }
-
-    REFRESH_TOKEN {
-        string id PK
-        string tokenHash UK
-        string userId FK
-        datetime expiresAt
-        datetime revokedAt
+    popular_names {
+        uuid id PK
+        uuid record_id FK
+        varchar name
+        smallint position
     }
-
-    NEWS_ITEM {
-        string id PK
-        string title
-        string link UK
-        string summary
-        string imageUrl
-        string sourceName
-        datetime publishedAt
+    photos {
+        uuid id PK
+        uuid record_id FK
+        text url
+        varchar credit
+        smallint position "0 = capa"
+    }
+    sources {
+        uuid id PK
+        uuid record_id FK
+        varchar citation
+        varchar url
+    }
+    reviews {
+        uuid id PK
+        uuid record_id FK
+        uuid actor_id FK
+        enum action "SUBMITTED | RESUBMITTED | APPROVED | REJECTED"
+        text note
+        timestamp created_at
+    }
+    news_sources {
+        varchar id PK
+        varchar name
+        text feed_url
+        text site_url
+        bool active
+    }
+    news_items {
+        uuid id PK
+        varchar source_id FK
+        text title
+        text link UK
+        text summary
+        text image_url
+        timestamp published_at
     }
 ```
 
-## Decisões
+## Decisões de modelagem
 
-- **Um registro = uma planta em um lugar.** É exatamente o que o cliente descreveu ("subir a foto,
-  colocar os dados da região e a fonte"). A mesma espécie pode aparecer várias vezes, em cidades
-  diferentes — isso é desejável para "plantas por região". A página da planta mostra também
-  "outros registros desta espécie".
-- **Enumerações como texto.** SQLite não tem `enum`; os valores válidos são garantidos pelo Zod
-  na API e ficam listados em `api/src/lib/catalog.ts`.
-- **Status de moderação no próprio registro.** Fila simples: `PENDING → APPROVED` ou
-  `PENDING → REJECTED → (colaborador edita) → PENDING`.
-- **Refresh tokens guardados como hash SHA-256** → vazamento do banco não entrega sessões válidas.
+| Decisão | Por quê |
+|---|---|
+| **`species` separada de `plant_records`** | A espécie (táxon) é uma só; o que se repete são as observações dela em lugares diferentes. Permite "outros registros desta espécie" e evita duplicar o nome científico. |
+| **Registro guarda luz, água, toxicidade etc.** | São afirmações do colaborador naquele envio, revisadas pelo mediador junto com a foto e a fonte. Se ficassem na espécie, um envio novo alteraria dados já aprovados de outras pessoas. |
+| **`popular_names`, `photos` e `sources` em tabelas próprias (1:N)** | Uma planta tem vários nomes populares, pode ter várias fotos e várias referências. Nada de listas em texto separadas por vírgula. |
+| **`reviews` como histórico** | Em vez de só um campo "observação", cada envio, reenvio, aprovação e recusa vira uma linha — auditoria completa de quem fez o quê e quando. O status atual fica desnormalizado em `plant_records.status` para consultas rápidas. |
+| **`states` e `municipalities` com códigos do IBGE** | Chave oficial e estável; nomes iguais em estados diferentes (ex.: "Bom Jesus") não se confundem. Municípios são criados sob demanda, buscando no IBGE no primeiro registro. |
+| **`biomes` como tabela** | Permite descrição e futuras traduções sem mudar código. Luz, água, toxicidade e papéis são `enum` do Postgres porque são fixos. |
+| **`search_text`** | Texto normalizado (sem acento, minúsculo) com nome científico, nomes populares, família e município. Busca por "ipe" encontra "Ipê" com um `LIKE` simples e indexável. |
+| **`news_sources` no banco** | Incluir ou desativar um site de notícias não exige deploy. |
+| **Refresh tokens com hash** | Um vazamento do banco não entrega sessões válidas. |
+| **Exclusões** | Apagar um registro apaga nomes, fotos, fontes e histórico (`CASCADE`). Apagar um usuário mantém os registros dele, sem autor (`SET NULL`). |
 
 ## Ciclo de vida de um registro
 
 ```mermaid
 stateDiagram-v2
-    [*] --> PENDING: colaborador envia
-    PENDING --> APPROVED: mediador aprova
-    PENDING --> REJECTED: mediador recusa (com observação)
-    REJECTED --> PENDING: colaborador corrige e reenvia
-    APPROVED --> PENDING: colaborador edita (volta para revisão)
+    [*] --> PENDING: colaborador envia (review SUBMITTED)
+    PENDING --> APPROVED: mediador aprova (review APPROVED)
+    PENDING --> REJECTED: mediador recusa com observação (review REJECTED)
+    REJECTED --> PENDING: colaborador corrige (review RESUBMITTED)
+    APPROVED --> PENDING: colaborador edita (review RESUBMITTED)
+    APPROVED --> REJECTED: mediador tira do ar
     APPROVED --> [*]: removido
+```
+
+## Comandos
+
+```bash
+npm run db:start     # sobe o Postgres local (sem Docker)
+npm run db:migrate   # cria uma nova migration a partir do schema.prisma
+npm run db:deploy    # aplica as migrations (produção)
+npm run db:seed      # dados de referência + conteúdo inicial
+npm run db:reset     # apaga tudo, reaplica migrations e seed
+npm run db:studio    # abre o Prisma Studio para navegar nas tabelas
 ```

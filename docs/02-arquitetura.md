@@ -11,7 +11,7 @@ flowchart LR
     subgraph Verdejar
       WEB[Front-end<br/>React SPA]
       API[API REST<br/>Node + Express]
-      DB[(Banco<br/>SQLite / Postgres)]
+      DB[(PostgreSQL)]
       FILES[(Fotos<br/>disco / Cloudinary)]
     end
 
@@ -31,24 +31,25 @@ Tudo que está fora da caixa *Verdejar* é **gratuito e público**.
 
 ```mermaid
 flowchart TB
-    subgraph Browser
+    subgraph Browser["frontend/ · navegador"]
       SPA[React 18 + Vite + TypeScript<br/>React Router · Leaflet]
       GEO[navigator.geolocation]
       SPA --- GEO
     end
 
-    subgraph Servidor["API (Node 20+)"]
+    subgraph Servidor["backend/ · API (Node 20+)"]
       direction TB
-      R[Rotas Express] --> MW[Middlewares<br/>helmet · cors · rate-limit<br/>auth JWT · validação Zod]
-      MW --> CTRL[Módulos<br/>auth · plants · moderation<br/>regions · news · users]
-      CTRL --> PRISMA[Prisma ORM]
-      CTRL --> STORE[Storage<br/>local ou Cloudinary]
+      R[Rotas] --> MW[Middlewares<br/>helmet · cors · rate-limit<br/>auth JWT · validação Zod]
+      MW --> CTRL[Controllers]
+      CTRL --> SVC[Services<br/>regras de negócio]
+      SVC --> PRISMA[Prisma ORM]
+      SVC --> STORE[Storage<br/>local ou Cloudinary]
       JOB[Job de notícias<br/>a cada 60 min] --> PRISMA
     end
 
     SPA -- "HTTPS /api/*<br/>Authorization: Bearer &lt;access&gt;" --> R
     SPA -- "cookie httpOnly<br/>refresh_token" --> R
-    PRISMA --> DB[(SQLite no dev<br/>Postgres em produção)]
+    PRISMA --> DB[(PostgreSQL<br/>migrations versionadas)]
 ```
 
 ### Por que essa stack
@@ -57,7 +58,8 @@ flowchart TB
 |---|---|
 | **SPA React + API separada** | Pedido explícito (comunicação por API). Permite hospedar o front em CDN gratuita e trocar o front no futuro (ex.: app mobile) sem mexer na API |
 | **Node + Express + TypeScript** | Ecossistema enorme, fácil achar quem dê manutenção, roda em qualquer hospedagem gratuita |
-| **Prisma** | Mesmo schema roda em SQLite (dev, zero instalação) e Postgres (produção) trocando uma linha |
+| **PostgreSQL + Prisma** | Banco relacional de verdade (enums, chaves estrangeiras, índices) com migrations versionadas no git. No dev sobe sem Docker (`npm run db:start`) |
+| **Monorepo com `backend/` e `frontend/` independentes** | Cada um tem seu `package.json`, `.env`, README e deploy. Dá para hospedar separados e até trocar um deles sem mexer no outro |
 | **JWT access + refresh** | Access token curto (15 min) vai no header; refresh token (7 dias) fica em cookie `httpOnly` e é guardado com hash no banco → dá para revogar no logout e rotacionar a cada uso |
 | **Leaflet + OpenStreetMap** | Mapa sem chave de API e sem cobrança (Google Maps cobra) |
 | **IBGE Localidades** | Lista oficial e gratuita de estados e municípios |
@@ -67,34 +69,52 @@ flowchart TB
 
 ```
 verdejar/
-├── docs/                 ← você está aqui
-├── api/
+├── docs/                    ← documentação e diagramas (você está aqui)
+├── img/                     ← capturas de todas as telas
+├── backend/                 ← API REST (Node + Express + Prisma)
 │   ├── prisma/
-│   │   ├── schema.prisma
-│   │   └── seed.ts       ← plantas iniciais + usuários de exemplo
+│   │   ├── schema.prisma    ← modelo de dados
+│   │   ├── migrations/      ← SQL versionado
+│   │   └── seed/            ← dados de referência e conteúdo inicial
+│   ├── scripts/dev-db.ts    ← Postgres local sem Docker
+│   ├── src/
+│   │   ├── server.ts        ← sobe o HTTP e o job de notícias
+│   │   ├── app.ts           ← monta o Express (middlewares + rotas)
+│   │   ├── config/env.ts    ← lê o .env
+│   │   ├── lib/             ← prisma, jwt, erros, storage, geo, texto
+│   │   ├── middlewares/     ← auth, validação, upload, erros
+│   │   └── modules/
+│   │       ├── auth/        ← routes · controller · service · schemas
+│   │       ├── plants/      ← routes · controller · service · schemas · mapper
+│   │       ├── moderation/
+│   │       ├── regions/
+│   │       ├── news/
+│   │       ├── users/
+│   │       └── catalog/
+│   └── tests/               ← testes automatizados (Vitest)
+├── frontend/                ← site (React + Vite)
 │   └── src/
-│       ├── server.ts     ← sobe o HTTP e o job de notícias
-│       ├── app.ts        ← monta o Express
-│       ├── config.ts     ← lê .env
-│       ├── lib/          ← prisma, jwt, erros, storage, geo
-│       ├── middlewares/  ← auth, validação, erros
-│       └── modules/
-│           ├── auth/
-│           ├── plants/
-│           ├── moderation/
-│           ├── regions/
-│           ├── news/
-│           └── users/
-└── web/
-    └── src/
-        ├── api/          ← cliente HTTP com refresh automático
-        ├── auth/         ← contexto de sessão
-        ├── components/
-        ├── pages/
-        └── styles/
+│       ├── api/             ← cliente HTTP com refresh automático + tipos
+│       ├── services/        ← uma função por endpoint da API
+│       ├── auth/            ← contexto de sessão
+│       ├── components/
+│       ├── pages/
+│       ├── lib/             ← hooks, rótulos, formatação
+│       └── styles/
+├── .github/workflows/ci.yml ← typecheck, testes, migrations e build a cada push
+├── docker-compose.yml       ← Postgres em container (opcional)
+└── render.yaml              ← deploy gratuito do backend
 ```
 
-Cada módulo da API segue o mesmo formato: `*.routes.ts` (HTTP) → `*.service.ts` (regras) → Prisma.
+Cada módulo do backend segue as mesmas camadas:
+
+| Camada | Responsabilidade |
+|---|---|
+| `*.routes.ts` | URL, método, middlewares (auth, papel, validação) |
+| `*.schemas.ts` | Formato da entrada (Zod) e mensagens de erro em português |
+| `*.controller.ts` | Traduz HTTP ↔ serviço (status, cookies, corpo) |
+| `*.service.ts` | Regras de negócio e acesso ao banco |
+| `*.mapper.ts` | Converte linhas do banco no JSON público (esconde dados privados) |
 
 ## Segurança
 
