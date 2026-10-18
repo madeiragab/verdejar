@@ -1,0 +1,21 @@
+# Alternativa ao `npm run db:start`: PostgreSQL em container.
+#   docker compose up -d
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: verdejar
+      POSTGRES_PASSWORD: verdejar
+      POSTGRES_DB: verdejar
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U verdejar']
+      interval: 5s
+      retries: 10
+
+volumes:
+  pgdata:

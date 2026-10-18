@@ -1,11 +1,22 @@
+# Dependências e builds
 node_modules/
 dist/
+
+# Ambiente (nunca versionar segredos)
 .env
+.env.*
+!.env.example
+
+# Banco local
+backend/.pgdata/
 *.db
 *.db-journal
-api/uploads/*
-!api/uploads/.gitkeep
-.DS_Store
+
+# Uploads feitos em desenvolvimento
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Logs e sistema
 *.log
-web/dist/
-api/dist/
+.DS_Store
+Thumbs.db
