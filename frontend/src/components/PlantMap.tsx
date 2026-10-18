@@ -11,6 +11,21 @@ const BRAZIL: LatLngBoundsExpression = [
   [5.3, -34.8],
 ];
 
+/**
+ * Camada do OpenStreetMap. A política de uso dos servidores do OSM exige o cabeçalho Referer
+ * identificando o site; sem ele os tiles voltam como "403 Access blocked".
+ */
+function OsmTiles() {
+  return (
+    <TileLayer
+      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+      referrerPolicy="strict-origin-when-cross-origin"
+      maxZoom={19}
+    />
+  );
+}
+
 function FitBounds({ points, me }: { points: [number, number][]; me?: Coords | null }) {
   const map = useMap();
   useEffect(() => {
@@ -36,10 +51,7 @@ export function PlantMap({ plants, me, height = 380 }: Props) {
   return (
     <div className="map" style={{ height }}>
       <MapContainer bounds={BRAZIL} scrollWheelZoom={false} style={{ height: '100%' }}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <OsmTiles />
         <FitBounds points={points.map((x) => x.pos)} me={me} />
         {me && (
           <CircleMarker center={[me.lat, me.lng]} radius={9} pathOptions={{ color: '#fff', weight: 3, fillColor: '#2563eb', fillOpacity: 1 }}>
@@ -88,10 +100,7 @@ export function LocationPicker({ value, onChange }: { value: Coords | null; onCh
   return (
     <div className="map" style={{ height: 280 }}>
       <MapContainer bounds={BRAZIL} style={{ height: '100%' }}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <OsmTiles />
         <ClickHandler onPick={onChange} />
         <Recenter center={center} />
         {center && (

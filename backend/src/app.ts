@@ -25,6 +25,8 @@ export function createApp() {
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
+      // O padrão do helmet (no-referrer) faz o OpenStreetMap bloquear os mapas: ele exige saber qual site pede os tiles.
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
       contentSecurityPolicy: {
         directives: {
           // Fotos e notícias vêm de vários sites; mapas do OpenStreetMap; fontes do Google.
